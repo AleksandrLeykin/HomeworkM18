@@ -1,20 +1,17 @@
 #pragma once
 #include <string>
 
-constexpr auto PathToText = " ";
+constexpr auto PathToText = "textOut.config";
 
 class Message {
 public:
-    Message();
-    ~Message();
-
-private:
-    //чтение из файла
-    void readFromFile();
-    //запись в файл
-    void writeToFile();
-
+    Message(const std::string& receiver, const std::string sender, const std::string& text);
+    ~Message() = default;
     std::string _text;
     std::string _sender;
     std::string _receiver;
+private:
+    //Р·Р°РїРёСЃСЊ РІ С„Р°Р№Р»
+    void writeToFile(const std::string& receiver, const std::string sender, const std::string& text);
+       
 };

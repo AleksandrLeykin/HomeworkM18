@@ -3,6 +3,9 @@
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include "Message.h"
+
 //путь к файлу
 constexpr auto   PathToFile = "userTest.config";
 
@@ -12,6 +15,8 @@ public:
     ~User();
 
     void getUserName();
+    void setTextOut(const std::string& outName, const std::string& text);
+    void getText();
 
 private:
     struct DateName {
@@ -34,4 +39,5 @@ private:
     std::string _pass;
 
     std::vector<DateName> userDate;
+    std::vector<Message> messageOut;
 };

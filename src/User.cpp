@@ -36,7 +36,20 @@ void User::getUserName()
 	}
 }
 
+void User::setTextOut(const std::string& outName, const std::string& text)
+{
+	Message message(outName, _name, text);
+	messageOut.push_back(message);
+}
 
+void User::getText()
+{
+	for (int i = 0; i < messageOut.size(); i++)
+	{
+		std::cout << messageOut[i]._text << " message from " 
+		<< messageOut[i]._sender << std::endl;
+	}
+}
 
 void User::readFromFile()
 {	

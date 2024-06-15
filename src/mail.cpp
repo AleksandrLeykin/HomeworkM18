@@ -11,5 +11,8 @@ int main() {
 
 	User sasha{ "Sasha", "shura", "2345" };
 
+	sasha.setTextOut("Ivan", "Hello!!");
+	sasha.getText();
+
 	return 0;
 }
