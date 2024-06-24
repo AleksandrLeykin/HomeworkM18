@@ -1,0 +1,239 @@
+Для того, чтобы сокеты заработали под Windows, необходимо при написании программы пройти следующие Этапы:
+
+1. Инициализация сокетных интерфейсов Win32API.
+
+2. Инициализация сокета, т.е. создание специальной структуры данных и её инициализация вызовом функции.
+
+3. «Привязка» созданного сокета к конкретной паре IP-адрес/Порт – с этого момента данный сокет (его имя)
+ будет ассоциироваться с конкретным процессом, который «висит» по указанному адресу и порту.
+
+4. Для серверной части приложения: запуск процедуры «прослушки» подключений на привязанный сокет.
+
+5. Для клиентской части приложения: запуск процедуры подключения к серверному сокету 
+(должны знать его IP-адрес/Порт).
+
+6. Акцепт / Подтверждение подключения (обычно на стороне сервера).
+
+7. Обмен данными между процессами через установленное сокетное соединение.
+
+8. Закрытие сокетного соединения.
+
+     Итак, попытаемся реализовать последовательность Этапов, указанных выше, для организации 
+простейшего чата между клиентом и сервером. Запускаем Visual Studio, выбираем создание консольного 
+проекта на С++ и поехали.
+
+Этап 0: Подключение всех необходимых библиотек Win32API для работы с сокетами
+Сокеты не являются «стандартными» инструментами разработки, поэтому для их активизации необходимо 
+подключить ряд библиотек через заголовочные файлы, а именно:
+
+WinSock2.h – заголовочный файл, содержащий актуальные реализации функций для работы с сокетами.
+
+WS2tcpip.h – заголовочный файл, который содержит различные программные интерфейсы, связанные с работой
+ протокола TCP/IP (переводы различных данных в формат, понимаемый протоколом и т.д.).
+
+Также нам потребуется прилинковать к приложению динамическую библиотеку ядра ОС: ws2_32.dll. 
+Делаем это через директиву компилятору: #pragma comment(lib, “ws2_32.lib”)
+
+Ну и в конце Этапа 0 подключаем стандартные заголовочные файлы iostream и stdio.h  
+
+Этап 1: Инициализация сокетных интерфейсов Win32API
+Прежде чем непосредственно создать объект сокет, необходимо «запустить» программные интерфейсы для работы с ними. 
+Под Windows это делается в два шага следующим образом:
+
+Нужно определить с какой версией сокетов мы работаем (какую версию понимает наша ОС) и
+
+Запустить программный интерфейс сокетов в Win32API. Ну либо расстроить пользователя тем, 
+что ему не удастся поработать с сокетами до обновления системных библиотек
+
+Первый шаг делается с помощью создания структуры типа WSADATA, в которую автоматически в момент создания загружаются 
+данные о версии сокетов, используемых ОС, а также иная связанная системная информация:WSADATA wsData;
+
+
+
+
+файл для клиента:
+#include <iostream>
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <stdio.h>
+#include <vector>
+
+#pragma comment(lib, "ws2_32.lib")
+
+int main() {
+	//создания структуры типа WSADATA, в которую автоматически в момент создания загружаются 
+	// данные о версии сокетов, используемых ОС, а также иная связанная системная информация
+	WSADATA wsData;
+
+	int erStat = WSAStartup(MAKEWORD(2, 2), &wsData);
+	if (erStat != 0) {
+		std::cout << "Error WinSock version initializaion #";
+		std::cout << WSAGetLastError();
+		return 1;
+	}
+	else
+		std::cout << "WinSock initialization is OK" << std::endl;
+
+	//Этап 2: Создание сокета и его инициализация
+	SOCKET ClientSock = socket(AF_INET, SOCK_STREAM, 0);
+	if (ClientSock == INVALID_SOCKET) {
+		std::cout << "Error initialization socket # " << WSAGetLastError() << std::endl;
+		closesocket(ClientSock);
+		WSACleanup();
+		return 1;
+	}
+	else
+		std::cout << "Server socket initialization is OK" << std::endl;
+
+	//Этап 3: Привязка сокета к паре IP-адрес/Порт	
+	//структура типа in_addr, которая представляет особый вид обычного строчного IPv4 адреса.
+	in_addr ip_to_num;
+
+	//int inet_pton(int <семейство адресов>, char[] <строка, содержащая IP-адрес в обычном виде с точкой-разделителем>, 
+	// in_addr* <указатель на структуру типа in_addr, в которую нужно помеc-ть резул-т 
+	// приведения строчного адреса в численный>)
+	erStat = inet_pton(AF_INET, "127.0.0.1", &ip_to_num);
+	if (erStat <= 0) {
+		std::cout << "Error in IP translation to special numeric format" << std::endl;
+		return 1;
+	}
+
+	sockaddr_in servInfo;
+
+	ZeroMemory(&servInfo, sizeof(servInfo));
+
+	servInfo.sin_family = AF_INET;
+	servInfo.sin_addr = ip_to_num;	  // Server's IPv4 after inet_pton() function
+	servInfo.sin_port = htons(1234);
+
+	
+	
+	erStat = connect(ClientSock, (sockaddr*)&servInfo, sizeof(servInfo));
+
+	if (erStat != 0) {
+		std::cout << "Connection to Server is FAILED. Error # " << WSAGetLastError() << std::endl;
+		closesocket(ClientSock);
+		WSACleanup();
+		return 1;
+	}
+	else
+		std::cout << "Connection established SUCCESSFULLY. Ready to send a message to Server" << std::endl;
+
+	return 0;
+
+
+
+файл для сервера: 
+#include <iostream>
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <stdio.h>
+#include <vector>
+
+#pragma comment(lib, "ws2_32.lib")
+//#pragma comment(lib, "")
+
+
+
+int main() {
+	//создания структуры типа WSADATA, в которую автоматически в момент создания загружаются 
+	// данные о версии сокетов, используемых ОС, а также иная связанная системная информация
+	WSADATA wsData;
+
+	int erStat = WSAStartup(MAKEWORD(2, 2), &wsData);
+	if (erStat != 0) {
+		std::cout << "Error WinSock version initializaion #";
+		std::cout << WSAGetLastError();
+		return 1;
+	}
+	else
+		std::cout << "WinSock initialization is OK" << std::endl;
+
+	//Этап 2: Создание сокета и его инициализация
+	SOCKET ServSock = socket(AF_INET, SOCK_STREAM, 0);
+	if (ServSock == INVALID_SOCKET) {
+		std::cout << "Error initialization socket # " << WSAGetLastError() << std::endl;
+		closesocket(ServSock);
+		WSACleanup();
+		return 1;
+	}
+	else
+		std::cout << "Server socket initialization is OK" << std::endl;
+
+	//Этап 3: Привязка сокета к паре IP-адрес/Порт	
+	
+	//структура типа in_addr, которая представляет особый вид обычного строчного IPv4 адреса.
+	in_addr ip_to_num;
+
+	//int inet_pton(int <семейство адресов>, char[] <строка, содержащая IP-адрес в обычном виде с точкой-разделителем>, 
+	// in_addr* <указатель на структуру типа in_addr, в которую нужно помеc-ть резул-т 
+	// приведения строчного адреса в численный>)
+	erStat = inet_pton(AF_INET, "127.0.0.1", &ip_to_num);
+	if (erStat <= 0) {
+		std::cout << "Error in IP translation to special numeric format" << std::endl;
+		return 1;
+	}
+
+	//Но как же явно указать адрес и порт для привязки сокета ? Для этого нужно воспользоваться другой структурой, 
+	// родственной sockaddr, которая легко приводится к этому типу - структурой типа sockaddr_in.
+	sockaddr_in servInfo;
+	ZeroMemory(&servInfo, sizeof(servInfo));
+
+	servInfo.sin_family = AF_INET;
+	servInfo.sin_addr = ip_to_num;
+	servInfo.sin_port = htons(1234);
+
+	//непосредственно привязка
+	//int bind(SOCKET <имя сокета, к которому необходимо привязать адрес и порт>, 
+	//sockaddr* <указатель на структуру, содержащую дета-ую информацию по адресу и порту, к которому надо привязать сокет>, 
+	//int <размер структуры, содержащей адрес и порт>)
+	erStat = bind(ServSock, (sockaddr*)&servInfo, sizeof(servInfo));
+
+	if (erStat != 0) {
+		std::cout << "Error Socket binding to server info. Error # " << WSAGetLastError() << std::endl;
+		closesocket(ServSock);
+		WSACleanup();
+		return 1;
+	}
+	else
+		std::cout << "Binding socket to Server info is OK" << std::endl;
+
+	//Этап 4 (для сервера) : «Прослушивание» привязанного порта для идентификации подключений
+	//int listen(SOCKET <«слушающий» сокет, который мы создавали на предыдущих этапах>, 
+	// int <максимальное количество процессов, разрешенных к подключению>)
+	erStat = listen(ServSock, SOMAXCONN);
+
+	if (erStat != 0) {
+		std::cout << "Can't start to listen to. Error # " << WSAGetLastError() << std::endl;
+		closesocket(ServSock);
+		WSACleanup();
+		return 1;
+	}
+	else {
+		std::cout << "Listening..." << std::endl;
+	}
+
+	//Этап 5 (только для Сервера).Подтверждение подключения
+	//SOCKET accept(SOCKET <"слушающий" сокет на стороне Сервера>, 
+	// sockaddr* <указатель на пустую структуру sockaddr, в которую будет записана информация по подключившемуся Клиенту>, 
+	// int* <указатель на размер структуры типа sockaddr>)
+	sockaddr_in clientInfo;
+
+	ZeroMemory(&clientInfo, sizeof(clientInfo));
+
+	int clientInfo_size = sizeof(clientInfo);
+
+	SOCKET ClientConn = accept(ServSock, (sockaddr*)&clientInfo, &clientInfo_size);
+
+	if (ClientConn == INVALID_SOCKET) {
+		std::cout << "Client detected, but can't connect to a client. Error # " << WSAGetLastError() << std::endl;
+		closesocket(ServSock);
+		closesocket(ClientConn);
+		WSACleanup();
+		return 1;
+	}
+	else
+		std::cout << "Connection to a client established successfully" << std::endl;
+
+	return 0;
+}
